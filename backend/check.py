@@ -1,113 +1,55 @@
-# This script sends sample data to each of the disease prediction endpoints
-# to verify that the backend API is working correctly.
+# Import the pandas library for data manipulation and analysis
+import pandas as pd
 
-import requests
-import json
+# --- Step 1: Define the list of dataset filenames ---
+# IMPORTANT: Replace these placeholder filenames with the actual names of your four dataset files.
+# Make sure the files are in the same directory as this script.
+dataset_files = [
+    'data/kidneydisease.csv',
+    'data/diabetes.csv',
+    'data/heart.csv',
+    'data/hypertension_dataset.csv'
+]
 
-# Define the base URL of your FastAPI server
-BASE_URL = "http://127.0.0.1:8000"
-
-# Sample data payloads for each disease
-# These payloads are complete and match the feature requirements of each model.
-
-sample_data = {
-    "heart": {
-        "Age": 40,
-        "Sex": "M",
-        "ChestPainType": "ATA",
-        "RestingBP": 140,
-        "Cholesterol": 289,
-        "FastingBS": 0,
-        "RestingECG": "Normal",
-        "MaxHR": 172,
-        "ExerciseAngina": "N",
-        "Oldpeak": 0.0,
-        "ST_Slope": "Up"
-    },
-    "diabetes": {
-        "Pregnancies": 6,
-        "Glucose": 148.0,
-        "BloodPressure": 72.0,
-        "SkinThickness": 35.0,
-        "Insulin": 155.5,
-        "BMI": 33.6,
-        "DiabetesPedigreeFunction": 0.627,
-        "Age": 50
-    },
-    "cardio": {
-        "age": 50,
-        "gender": 2,
-        "height": 168,
-        "weight": 62.0,
-        "ap_hi": 110,
-        "ap_lo": 80,
-        "cholesterol": 1,
-        "gluc": 1,
-        "smoke": 0,
-        "alco": 0,
-        "active": 1
-    },
-    "kidney": {
-        "age": 48.0,
-        "bp": 80.0,
-        "sg": 1.02,
-        "al": 1.0,
-        "su": 0.0,
-        "rbc": "normal",
-        "pc": "normal",
-        "pcc": "notpresent",
-        "ba": "notpresent",
-        "bgr": 121.0,
-        "bu": 36.0,
-        "sc": 1.2,
-        "sod": 137.5,
-        "pot": 4.6,
-        "hemo": 15.4,
-        "pcv": 44.0,
-        "wc": 7800.0,
-        "rc": 5.2,
-        "htn": "yes",
-        "dm": "yes",
-        "cad": "no",
-        "appet": "good",
-        "pe": "no",
-        "ane": "no"
-    },
-    "hypertension": {
-        "age": 50,
-        "gender": 2,
-        "height": 168,
-        "weight": 62.0,
-        "ap_hi": 110,
-        "ap_lo": 80,
-        "cholesterol": 1,
-        "gluc": 1,
-        "smoke": 0,
-        "alco": 0,
-        "active": 1
-    }
-}
-
-# Iterate through each disease and test its prediction endpoint
-for disease, data in sample_data.items():
-    url = f"{BASE_URL}/predict/{disease}"
-    headers = {"Content-Type": "application/json"}
-    
-    print(f"\n--- Testing Endpoint: POST {url} ---")
+# --- Step 2: Loop through each dataset and print information ---
+for file_name in dataset_files:
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        response.raise_for_status() # Raise an HTTPError for bad status codes (4xx or 5xx)
-        
-        # If the request was successful, print the status and response
-        print(f"✅ Success! Status Code: {response.status_code}")
-        print("Response Body:")
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.HTTPError as err:
-        # If there's an HTTP error, print the error details
-        print(f"❌ HTTP Error for {disease}: {err}")
-        print(f"Response Content: {response.text}")
-    except requests.exceptions.RequestException as err:
-        # Handle other request-related errors (e.g., connection errors)
-        print(f"❌ Request Error for {disease}: {err}")
-        print("Is the FastAPI server running? Please check 'uvicorn main:app --reload'")
+        # Load the dataset from the CSV file
+        df = pd.read_csv(file_name)
+
+        # --- Section Header for Clarity ---
+        print(f"============================================================")
+        print(f"           ANALYZING DATASET: {file_name}")
+        print(f"============================================================")
+
+        # --- Get a general overview of the data ---
+        print("\n--- First 5 rows of the dataset ---")
+        print(df.head())
+
+        # Get the number of rows and columns (shape of the DataFrame)
+        print("\n--- Shape of the dataset (rows, columns) ---")
+        print(df.shape)
+
+        # --- Check for data types and missing values ---
+        # The .info() method shows column names, non-null counts, and data types
+        print("\n--- Detailed information (data types & non-null counts) ---")
+        df.info()
+
+        # A more direct way to count missing values
+        print("\n--- Count of missing values in each column ---")
+        print(df.isnull().sum())
+
+        # --- Get descriptive statistics for numerical columns ---
+        # .describe() provides statistical summary for numerical columns
+        print("\n--- Descriptive statistics for numerical columns ---")
+        print(df.describe())
+
+        # Add a separator to make the output for each file distinct
+        print("\n\n")
+
+    except FileNotFoundError:
+        print(f"Error: The file '{file_name}' was not found.")
+        print("Please make sure the file name is correct and it's in the same directory as the script.")
+    except Exception as e:
+        print(f"An error occurred while processing '{file_name}': {e}")
+
