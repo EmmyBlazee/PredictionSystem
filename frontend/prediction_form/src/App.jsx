@@ -512,7 +512,7 @@ const App = () => {
     setPrediction(null);
     setShapData(null);
 
-    const backendUrl = 'http://127.0.0.1:8000';
+    const backendUrl = 'https://predictionsystem-fwa7.onrender.com';
 
     try {
       // Create a promise for the prediction API call
