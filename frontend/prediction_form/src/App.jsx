@@ -432,47 +432,66 @@ const App = () => {
 
   // 1. Firebase Initialization and Authentication
   useEffect(() => {
-    // Check if Firebase config is available globally
-    if (typeof __firebase_config !== 'undefined') {
-      const firebaseConfig = JSON.parse(__firebase_config);
-      const app = initializeApp(firebaseConfig);
-      const auth = getAuth(app);
-      const firestoreDb = getFirestore(app);
-      setDb(firestoreDb);
+    const initFirebase = async () => {
+      // Check if Firebase config is available globally
+      if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+        try {
+          const firebaseConfig = JSON.parse(__firebase_config);
+          const app = initializeApp(firebaseConfig);
+          const auth = getAuth(app);
+          const firestoreDb = getFirestore(app);
+          setDb(firestoreDb);
 
-      const unsubscribe = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          setUserId(user.uid);
-        } else {
-          try {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-              await signInWithCustomToken(auth, __initial_auth_token);
+          // Use onAuthStateChanged to handle authentication state changes
+          const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+              setUserId(user.uid);
+              console.log('User signed in with UID:', user.uid);
             } else {
-              await signInAnonymously(auth);
+              console.log('No user signed in. Attempting to sign in...');
+              try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                  await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                  await signInAnonymously(auth);
+                }
+                // setUserId will be updated by the onAuthStateChanged listener
+                // when the sign-in completes.
+              } catch (error) {
+                console.error('Authentication failed:', error);
+              }
             }
-            setUserId(auth.currentUser.uid);
-          } catch (error) {
-            console.error('Authentication failed:', error);
-          }
+            setIsAuthReady(true);
+          });
+          return () => unsubscribe(); // Cleanup function for the listener
+        } catch (error) {
+          console.error('Firebase initialization failed:', error);
+          setIsAuthReady(true);
         }
-        setIsAuthReady(true);
-      });
-
-      return () => unsubscribe(); // Cleanup function for the listener
-    } else {
-      console.error('Firebase config is not available.');
-      setIsAuthReady(true); // Ensure the app loads even without Firebase
-    }
+      } else {
+        console.error('Firebase config is not available.');
+        setIsAuthReady(true); // Ensure the app loads even without Firebase
+      }
+    };
+    initFirebase();
   }, []);
 
   // 2. Real-time Firestore Data Fetching
+  // This useEffect is dependent on `db` and `userId` becoming available,
+  // which happens after the authentication process is complete.
   useEffect(() => {
-    if (!isAuthReady || !db || !userId) return;
+    // Only proceed if Firebase is initialized and we have a valid userId
+    if (!isAuthReady || !db || !userId) {
+      console.log('Skipping Firestore listener setup. Auth state not ready or no user ID.');
+      return;
+    }
 
     // The collection path for private data
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     const collectionPath = `/artifacts/${appId}/users/${userId}/prediction_history`;
     const q = query(collection(db, collectionPath));
+
+    console.log(`Setting up real-time listener for collection: ${collectionPath}`);
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const history = [];
@@ -483,11 +502,16 @@ const App = () => {
         }
       });
       setPredictionHistory(history);
+      console.log('Fetched prediction history:', history);
     }, (error) => {
       console.error('Error fetching prediction history:', error);
     });
 
-    return () => unsubscribe();
+    // Cleanup function for the listener
+    return () => {
+      console.log('Unsubscribing from Firestore listener.');
+      unsubscribe();
+    };
   }, [db, userId, isAuthReady]);
 
   /**
@@ -563,6 +587,9 @@ const App = () => {
             formData,
             timestamp: serverTimestamp(),
           });
+          console.log('Prediction data successfully added to Firestore.');
+        } else {
+          console.warn('Cannot save to Firestore: db or userId is not available.');
         }
       } else {
         setPrediction({ error: predictionResult.reason.message });
@@ -590,7 +617,10 @@ const App = () => {
    * This function uses a batch write for efficiency.
    */
   const handleClearHistory = async () => {
-    if (!db || !userId) return;
+    if (!db || !userId) {
+      console.warn('Cannot clear history: db or userId is not available.');
+      return;
+    }
 
     setIsClearingHistory(true);
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -639,7 +669,7 @@ const App = () => {
       <Container maxWidth="lg" sx={{ my: 4 }}>
         <Box sx={{ textAlign: 'center', mb: 6 }}>
           <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            Medical Diagnosis Predictor
+            Prevalent Disease Prediction System
           </Typography>
           <Typography variant="h6" color="text.secondary">
             User ID: {userId}
